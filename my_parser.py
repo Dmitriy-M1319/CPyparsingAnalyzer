@@ -110,14 +110,14 @@ def _parser():
     decl = decl_type + ident + plt.Optional(ASSIGN + expression)
 
     # Объявление параметров функции
-    func_decl_params = plt.ZeroOrMore(decl + plt.Optional(COMMA))
+    decl_list = plt.ZeroOrMore(decl + plt.Optional(COMMA))
     func_call_params = plt.ZeroOrMore(expression + plt.Optional(COMMA))
 
     # Объявление тела функции (циклов, условного оператора)
     op_body = LBRACE + statement_list + RBRACE
 
     # Объявление функции
-    func_decl = decl_type + ident + LPAREN + func_decl_params + RPAREN + op_body
+    func_decl = decl_type + ident + LPAREN + decl_list + RPAREN + op_body
     func_call = ident + LPAREN + func_call_params + RPAREN
 
     # Оператор возврата значения

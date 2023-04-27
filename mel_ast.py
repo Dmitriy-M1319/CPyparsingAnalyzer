@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Optional, Union, Tuple, Callable
 from contextlib import suppress
 
-from my_semantic_baza import TYPE_CONVERTIBILITY, BinOperation, \
+from my_semantic_baza import TYPE_CONVERTIBILITY, \
     TypeDesc, IdentDesc, IdentScope, SemanticException
 
 
@@ -12,10 +12,11 @@ class AstNode(ABC):
     def __init__(self, row: Optional[int] = None, **props) -> None:
         super().__init__()
         self.row = row
-        for k, v in props.items():
+        for k, v in props.items(): # паттерн контейнер свойств: получаем словарь свойств и добавляем их в класс
             setattr(self, k, v)
-        self.node_type: Optional[TypeDesc] = None
-        self.node_ident: Optional[IdentDesc] = None
+        # здесь надо будет потом понять, является ли узел идентификатором или типом объявления
+        self.node_type: Optional[TypeDesc] = None 
+        self.node_ident: Optional[IdentDesc] = None 
 
     @property
     def childs(self)->Tuple['AstNode', ...]:
@@ -34,10 +35,10 @@ class AstNode(ABC):
             r = str(self.node_ident)
         elif self.node_type:
             r = str(self.node_type)
-        return self.to_str() + (' : ' + r if r else '')
+        return self.to_str() + (' : ' + r if r else '') # в конце через : добавляется тип или идентификатор
 
     def semantic_error(self, message: str):
-        raise SemanticException(message, self.row)
+            raise SemanticException(message, self.row)
 
     @property
     def tree(self):
@@ -50,11 +51,11 @@ class AstNode(ABC):
             res.extend(((ch0 if j == 0 else ch) + ' ' + s for j, s in enumerate(child.tree)))
         return res
 
-    def visit(self, func: Callable[['AstNode'], None])->None:
+    def visit(self, func: Callable[['AstNode'], None])->None: # кусочек реализации паттерна посетитель
         func(self)
-        map(func, self.childs)
+        map(func, self.childs) # посещаем все поддерева
 
-    def __getitem__(self, index):
+    def __getitem__(self, index): # я так понял, это переопределение операции индексирования
         return self.childs[index] if index < len(self.childs) else None
 
 
@@ -95,6 +96,9 @@ class BinOp(Enum):
     NE = '!='
     AND = '&&'
     OR = '||'
+
+    def __str__(self) -> str:
+        return str(self.value)
 
 
 class BinOpNode(ValueNode):
@@ -143,6 +147,7 @@ class DeclTypeNode(IdentNode):
                  row: Optional[int] = None, **props) -> None:
         super().__init__(name, row=row, **props)
         self.type = None
+        # пытаемся создать тип данных
         with suppress(SemanticException):
             self.type = TypeDesc.from_str(name)
 
@@ -167,23 +172,6 @@ class TypeConvertNode(ValueNode):
     @property
     def childs(self) -> Tuple[AstNode, ...]:
         return (_GroupNode(str(self.type), self.expr), )
-
-
-def type_convert(expr: ValueNode, type_: TypeDesc, except_node: Optional[AstNode] = None, comment: Optional[str] = None) -> ValueNode:
-    """Метод преобразования ExprNode узла AST-дерева к другому типу
-    """
-
-    if expr.node_type is None:
-        except_node.semantic_error('Тип выражения не определен')
-    if expr.node_type == type_:
-        return expr
-    if expr.node_type.is_simple and type_.is_simple and \
-            expr.node_type.base_type in TYPE_CONVERTIBILITY and type_.base_type in TYPE_CONVERTIBILITY[expr.node_type.base_type]:
-        return TypeConvertNode(expr, type_)
-    else:
-        (except_node if except_node else expr).semantic_error('Тип {0}{2} не конвертируется в {1}'.format(
-            expr.node_type, type_, ' ({})'.format(comment) if comment else ''
-        ))
 
 
 class AssignNode(StatementNode):
@@ -296,8 +284,8 @@ class DeclListNode(AstNode):
         return 'params'
 
 
-class FuncDeclNode(AstNode):
-    def __init__(self, func_type: DeclTypeNode, name, params, body, row: Optional[int] = None, **props) -> None:
+class FuncDeclNode(StatementNode):
+    def __init__(self, func_type: DeclTypeNode, name, params: DeclListNode, body, row: Optional[int] = None, **props) -> None:
         super().__init__(row=row, **props)
         self.func_type = func_type
         self.name = name

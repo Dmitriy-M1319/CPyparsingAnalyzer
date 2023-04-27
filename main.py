@@ -8,14 +8,14 @@ import my_semantic_baza
 
 def main():
     prog = '''
-        void foo(int a) {
+        /*void foo(int a) {
             if (a != 2) {
                 a = a + 1;
             }
-        }
+        }*/
 
         int a = 5;
-        foo(a);
+        //foo(a);
         string str = "Hello";
         char c = 'a';
         int i;
