@@ -1,6 +1,16 @@
 from typing import Any, Dict, Optional, Tuple
 from enum import Enum
 
+# Встроенные в язык функции
+BUILT_IN_OBJECTS = '''
+    string input() { }
+    void write(string s0) { }
+    void writeline(string s0) { }
+    int to_int(string s0) { }
+    float to_float(string s0) { }
+'''
+
+
 class BinOp(Enum):
     ADD = '+'
     SUB = '-'
@@ -17,7 +27,7 @@ class BinOp(Enum):
     OR = '||'
 
     def __str__(self) -> str:
-        return str(self.value)
+        return self.value
 
 class BaseType(Enum):
     """
@@ -236,6 +246,18 @@ class IdentScope:
                 break
             scope = scope.parent
         return ident
+
+
+def prepare_global_scope() -> IdentScope:
+    from my_parser import parse
+    prog = parse(BUILT_IN_OBJECTS)
+    scope = IdentScope()
+    prog.semantic_check(scope)
+    # prog.semantic_check(scope)
+    for name, ident in scope.idents.items():
+        ident.built_in = True
+    scope.var_index = 0
+    return scope
 
 
 class SemanticException(Exception):
