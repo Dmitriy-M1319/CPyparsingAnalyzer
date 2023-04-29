@@ -13,12 +13,12 @@ def main():
             }
         }
 
-        int a = 5;
-        foo(a);
+        foo(5);
         string str = "Hello";
         char c = 'a';
-        int i;
-        for (; ; ) { 
+        int a = 1;
+        int s;
+        for(int i = 1; i < 7; i = i + 1) { 
             s = 7; 
         }
         while (a != 7) {
@@ -27,7 +27,7 @@ def main():
         }
 
         if (a > 5) {
-            return 0;
+            a = 5;
         }
     '''
 
@@ -35,17 +35,17 @@ def main():
         int a = 5;
     '''
     
-    prog1 = my_parser.parse(prog2)
+    prog1 = my_parser.parse(prog)
     print(prog1)
     print(*prog1.tree, sep=os.linesep)
-    try:
-        scope = my_semantic_baza.prepare_global_scope()
-        prog1.semantic_check(scope)
-        print(*prog1.tree, sep=os.linesep)
-        print()
-    except my_semantic_baza.SemanticException as e:
-        print('Ошибка: {}'.format(e.message), file=sys.stderr)
-        exit(2)
+    #try:
+    scope = my_semantic_baza.prepare_global_scope()
+    prog1.semantic_check(scope)
+    print(*prog1.tree, sep=os.linesep)
+    print()
+    #except my_semantic_baza.SemanticException as e:
+     #    print('Ошибка: {}'.format(e.message), file=sys.stderr)
+      #   exit(2)
 
 
 

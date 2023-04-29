@@ -74,7 +74,7 @@ def _parser():
 
     # Идентификатор
     ident = plt.pyparsing_common.identifier.copy().setName('ident')
-    decl_type = ident.copy()
+    decl_type = ident.copy().setName('decl_type')
 
     # Группа
     add = plt.Forward()
@@ -111,14 +111,14 @@ def _parser():
 
     # Объявление параметров функции
     decl_list = plt.ZeroOrMore(decl + plt.Optional(COMMA))
-    func_call_params = plt.ZeroOrMore(expression + plt.Optional(COMMA))
+    value_list = plt.ZeroOrMore(expression + plt.Optional(COMMA))
 
     # Объявление тела функции (циклов, условного оператора)
     op_body = LBRACE + statement_list + RBRACE
 
     # Объявление функции
     func_decl = decl_type + ident + LPAREN + decl_list + RPAREN + op_body
-    func_call = ident + LPAREN + func_call_params + RPAREN
+    func_call = ident + LPAREN + value_list + RPAREN
 
     # Оператор возврата значения
     return_op = plt.Keyword('return').suppress() + plt.Optional(expression)
@@ -131,7 +131,7 @@ def _parser():
     while_header = plt.Keyword('while').suppress() + LPAREN + expression + RPAREN
     while_op = while_header + op_body
 
-    for_header = plt.Keyword('for').suppress() + LPAREN + statement_list + SEMICOLON + plt.Optional(expression) + SEMICOLON + plt.Optional(statement_list) + RPAREN
+    for_header = plt.Keyword('for').suppress() + LPAREN + statement + SEMICOLON + plt.Optional(expression) + SEMICOLON + plt.Optional(statement_list) + RPAREN
     for_op = for_header + op_body
 
     # Выражение

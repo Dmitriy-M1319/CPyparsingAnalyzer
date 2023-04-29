@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Optional, Union, Tuple, Callable, List
 from contextlib import suppress
 
 from my_semantic_baza import TYPE_CONVERTIBILITY, \
-    TypeDesc, IdentDesc, IdentScope, SemanticException
+    TypeDesc, IdentDesc, IdentScope, SemanticException, BIN_OP_TYPE_COMPATIBILITY
+from binop import BinOp
 
 
 class AstNode(ABC):
@@ -23,7 +23,7 @@ class AstNode(ABC):
         return ()
 
     @abstractmethod
-    def __str__(self)->str:
+    def __str__(self) -> str:
         pass
 
     def semantic_check(self, scope: IdentScope):
@@ -34,18 +34,18 @@ class AstNode(ABC):
 
     def to_str_full(self):
         r = ''
-        if self.node_ident:
-            r = str(self.node_ident)
-        elif self.node_type:
+        if self.node_type:
             r = str(self.node_type)
-        return self.to_str() + (' : ' + r if r else '') # в конце через : добавляется тип или идентификатор
+        if self.node_ident:
+            r += ', ' + str(self.node_ident)
+        return self.to_str() + (' => ' + r if r else '') # в конце через : добавляется тип или идентификатор
 
     def semantic_error(self, message: str):
             raise SemanticException(message, self.row)
 
     @property
     def tree(self):
-        res = [str(self)]
+        res = [self.to_str_full()]
         childs = self.childs
         for i, child in enumerate(childs):
             ch0, ch = '├', '│'
@@ -128,25 +128,6 @@ class IdentNode(ValueNode):
         return str(self.name)
 
 
-class BinOp(Enum):
-    ADD = '+'
-    SUB = '-'
-    MUL = '*'
-    DIV = '/'
-    MOD = '%'
-    GT = '>'
-    LT = '<'
-    GE = '>='
-    LE = '<='
-    EQ = '=='
-    NE = '!='
-    AND = '&&'
-    OR = '||'
-
-    def __str__(self) -> str:
-        return str(self.value)
-
-
 class BinOpNode(ValueNode):
     def __init__(self, op: BinOp, arg1: ValueNode, arg2: ValueNode, 
                  row: Optional[int] = None, **props):
@@ -166,7 +147,7 @@ class BinOpNode(ValueNode):
 
         if self.arg1.node_type.is_simple or self.arg2.self_type.is_simple: # если один из аргументов представляет собой простой тип
             compatibility = BIN_OP_TYPE_COMPATIBILITY[self.op] # находим типы, которые между собой могут взаимодействовать
-            args_types = (self.arg1.node_type.base_type, self.arg2.self_type.base_type)
+            args_types = (self.arg1.node_type.base_type, self.arg2.node_type.base_type)
             if args_types in compatibility:
                 self.node_type = TypeDesc.from_base_type(compatibility[args_types]) # если с типами все ок, устанавливаем итоговый тип выражения
                 return
@@ -271,7 +252,7 @@ class AssignNode(StatementNode):
         self.var.semantic_check(scope)
         self.val.semantic_check(scope)
         self.val = type_convert(self.val, self.var.node_type, self, 'присваиваемое значение')
-        self.node_type = self.var.self_type
+        self.node_type = self.var.node_type
 
 
     def __str__(self)->str:
@@ -315,11 +296,11 @@ class IfOpNode(StatementNode):
             return (self.cond, self.thenStmts, self.elseStmts)
 
     def semantic_check(self, scope: IdentScope):
-        self.cond.semantic_check(self, scope)
+        self.cond.semantic_check(scope)
         self.cond = type_convert(self.cond, TypeDesc.INT, None, 'условие') # приводим к int, так как у нас в обычном С нет булевского типа
-        self.thenStmts.semantic_check(self, IdentScope(scope))
+        self.thenStmts.semantic_check(IdentScope(scope))
         if self.elseStmts:
-            self.elseStmts.semantic_check(self, IdentScope(scope))
+            self.elseStmts.semantic_check(IdentScope(scope))
         self.node_type = TypeDesc.VOID
 
     def __str__(self) -> str:
@@ -392,7 +373,7 @@ class DeclNode(StatementNode):
     def semantic_check(self, scope: IdentScope):
         self.decl_type.semantic_check(scope)
         try:
-            scope.add_ident(IdentDesc(self.ident, self.decl_type.type))
+            scope.add_ident(IdentDesc(self.ident.name, self.decl_type.type))
         except SemanticException as e:
             self.semantic_error(e.message) 
         self.node_type = TypeDesc.VOID
@@ -446,6 +427,7 @@ class FuncDeclNode(StatementNode):
         for param in self.params.params:
             param.semantic_check(scope)
             params.append(param.decl_type.type)
+            # scope.add_ident(IdentDesc(param.ident.name, param.decl_type.type))
 
         type_ = TypeDesc(None, self.func_type.type, tuple(params))
         func_ident = IdentDesc(self.name.name, type_)
@@ -455,7 +437,7 @@ class FuncDeclNode(StatementNode):
             self.name.node_ident = parent_scope.curr_global.add_ident(func_ident)
         except SemanticException as e:
             self.name.semantic_error("Повторное объявление функции {}".format(self.name.name))
-        self.body.semantic_check(self, scope)
+        self.body.semantic_check(scope)
         self.node_type = TypeDesc.VOID
 
 
@@ -463,8 +445,26 @@ class FuncDeclNode(StatementNode):
         return f'fn -> {self.func_type}'
 
 
+class ValueListNode(AstNode):
+    def __init__(self, *params: ValueNode, row: Optional[int] = None, **props):
+        super().__init__(row=row, **props)
+        self.params = params
+
+    @property
+    def childs(self) -> Tuple[ValueNode]:
+        return self.params
+
+    def semantic_check(self, scope: IdentScope):
+        for param in self.params:
+            param.semantic_check(scope)
+        self.node_type = TypeDesc.VOID
+
+    def __str__(self) -> str:
+        return 'params'
+
+
 class FuncCallNode(StatementNode):
-    def __init__(self, name: IdentNode, params=None, row: Optional[int] = None, **props) -> None:
+    def __init__(self, name: IdentNode, params: ValueListNode, row: Optional[int] = None, **props) -> None:
         super().__init__(row=row, **props)
         self.name = name
         self.params = params
@@ -472,7 +472,7 @@ class FuncCallNode(StatementNode):
     @property
     def childs(self) -> Tuple['AstNode', ...]:
         if self.params == None:
-            return self.name, 
+            return self.name,
         else:
             return (self.name, self.params)
 
@@ -482,14 +482,14 @@ class FuncCallNode(StatementNode):
             self.semantic_error('Функция {} не найдена'.format(self.name.name))
         if not func.type.func: # если данный идентификатор не функция 
             self.semantic_error('Идентификатор {} не является функцией'.format(func.name))
-        if len(func.func_type.params) != len(self.params):
+        if len(func.type.params) != len(self.params.params):
             self.semantic_error('Кол-во аргументов {} не совпадает (ожидалось {}, передано {})'.format(
-                func.name, len(func.func_type.params), len(self.params)
+                func.name, len(func.type.params), len(self.params)
             ))
         params = []
         error = False
         decl_params_str = fact_params_str = ''
-        for i in range(len(self.params)):
+        for i in range(len(self.params.params)):
             param: ValueNode = self.params[i] # вытаскиваем какое то rvalue значение или expr
             param.semantic_check(scope)
             if len(decl_params_str) > 0:
@@ -508,7 +508,7 @@ class FuncCallNode(StatementNode):
                 func.name, fact_params_str, decl_params_str
             ))
         else:
-            self.params = tuple(params)
+            self.params.params = params
             self.name.node_type = func.type
             self.name.node_ident = func
             self.node_type = func.type.return_type

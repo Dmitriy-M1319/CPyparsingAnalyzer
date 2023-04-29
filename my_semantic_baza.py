@@ -1,33 +1,16 @@
 from typing import Any, Dict, Optional, Tuple
 from enum import Enum
+from binop import BinOp
 
 # Встроенные в язык функции
 BUILT_IN_OBJECTS = '''
     string input() { }
     void write(string s0) { }
-    void writeline(string s0) { }
-    int to_int(string s0) { }
-    float to_float(string s0) { }
+    void writeline(string s1) { }
+    int to_int(string s2) { }
+    float to_float(string s3) { }
 '''
 
-
-class BinOp(Enum):
-    ADD = '+'
-    SUB = '-'
-    MUL = '*'
-    DIV = '/'
-    MOD = '%'
-    GT = '>'
-    LT = '<'
-    GE = '>='
-    LE = '<='
-    EQ = '=='
-    NE = '!='
-    AND = '&&'
-    OR = '||'
-
-    def __str__(self) -> str:
-        return self.value
 
 class BaseType(Enum):
     """
@@ -218,7 +201,7 @@ class IdentScope:
             else:
                 error = True
             if error:
-                raise SemanticException('Идентификатор'  + ident.name + 'уже объявлен')
+                raise SemanticException('Идентификатор '  + ident.name + ' уже объявлен')
 
         if not ident.type.func: # Если объявление не функция
             if ident.scope == ScopeType.PARAM:
