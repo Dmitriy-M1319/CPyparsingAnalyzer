@@ -185,6 +185,8 @@ def _parser():
 parser = _parser()
 
 def parse(prog: str) -> StatementListNode:
-    return parser.parseString(str(prog))[0]
+    prog = parser.parseString(str(prog))[0]
+    prog.program = True
+    return prog
 
 

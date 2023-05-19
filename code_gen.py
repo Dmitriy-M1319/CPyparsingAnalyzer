@@ -140,7 +140,7 @@ class CodeGenerator:
     @visitor.when(AssignNode)
     def msil_gen(self, node: AssignNode) -> None:
         # Добавляем инструкцию для аргумента присваивания
-        node.val.msil_gen(self)
+        self.msil_gen(node.val)
         var = node.var
         # А теперь то значение, которое мы пихнули в стек, выпихиваем оттуда и сохраняем в память согласно области видимости
         if var.node_ident.scope == ScopeType.LOCAL:
@@ -155,7 +155,7 @@ class CodeGenerator:
     @visitor.when(DeclNode)
     def msil_gen(self, node: DeclNode) -> None:
         if node.init_value != None:
-            node.init_value.msil_gen(self)
+            self.msil_gen(node.init_value)
             var = node.ident
             # А теперь то значение, которое мы пихнули в стек, выпихиваем оттуда и сохраняем в память согласно области видимости
             if var.node_ident.scope == ScopeType.LOCAL:
@@ -169,8 +169,8 @@ class CodeGenerator:
     @visitor.when(BinOpNode)
     def msil_gen(self, node: BinOpNode) -> None:
         # Генерируем инструкции для аргументов нашего действия (укладываем в стек)
-        node.arg1.msil_gen(self)
-        node.arg2.msil_gen(self)
+        self.msil_gen(node.arg1)
+        self.msil_gen(node.arg1)
         # Итак, если операция - это неравенство
         if node.op == BinOp.NE:
             if node.arg1.node_type == TypeDesc.STR:
@@ -281,7 +281,7 @@ class CodeGenerator:
     def msil_gen(self, node: ReturnOpNode) -> None:
         # тут ничего сверхъестественного: сначала помещаем то, что мы возвращаем, в стек, 
         # а потом делаем return через местную инструкцию ret
-        node.value.msil_gen(self)
+        self.msil_gen(node.value)
         self.add('ret')
 
     # Генерация кода для if (вот он, условный переход)
@@ -292,18 +292,18 @@ class CodeGenerator:
         end_label = CodeLabel()
 
         # генерим условие перехода (вписываем результат вычисления условия в стек)
-        node.cond.msil_gen(self)
+        self.msil_gen(node.cond)
         # инструкция, с помощью которой если if не сработал, нас перебрасывает на метку с else
         self.add('brfalse', else_label)
         # генерим тело if
-        node.thenStmts.msil_gen(self)
+        self.msil_gen(node.thenStmts)
         # здесь выполняется тупо безусловный переход в конец if
         self.add('br', end_label)
         # ставим метку конца if
         self.add('', label=else_label)
         if node.elseStmts:
             # если у нас присутствует блок else, то генерируем и его
-            node.elseStmts.msil_gen(self)
+            self.msil_gen(node.elseStmts)
         self.add('', label=end_label)
 
     # Генерация кода для цикла while (похожа на if)
@@ -313,10 +313,10 @@ class CodeGenerator:
         end_label = CodeLabel()
 
         self.add('', label=start_label)
-        node.cond.msil_gen(self)
+        self.msil_gen(node.cond)
         end_label = CodeLabel()
         self.add('brfalse', end_label)
-        node.stmts.msil_gen(self)
+        self.msil_gen(node.stmts)
         self.add('br', start_label)
         self.add('', label=end_label)
 
@@ -327,15 +327,15 @@ class CodeGenerator:
         end_label = CodeLabel()
 
         # генерируем инициализирующий блок
-        node.decl.msil_gen(self)
+        self.msil_gen(node.decl)
         self.add('', label=start_label)
         # потом создаем условие, согласно которому будет выполняться цикл или нет
-        node.cond.msil_gen(self)
+        self.msil_gen(node.cond)
         self.add('brfalse', end_label)
         # генерируем тело цикла
-        node.body.msil_gen(self)
+        self.msil_gen(node.body)
         # ну и инструкции при продвижении цикла вперед
-        node.stmt.msil_gen(self)
+        self.msil_gen(node.stmt)
         self.add('br', start_label)
         self.add('', label=end_label)
 
@@ -361,7 +361,7 @@ class CodeGenerator:
         decl = '.locals init ('
         count = 0
         for var in local_vars_decls:
-            if var.node_ident.scope == ScopeType.LOCAL:
+            if var.ident.node_ident.scope == ScopeType.LOCAL:
                     if count > 0:
                         decl += ', '
                     decl += f'{MSIL_TYPE_NAMES[var.node_type.base_type]} _v{var.node_ident.index}'
@@ -371,7 +371,7 @@ class CodeGenerator:
             self.add(decl)
 
         # и осталось сгенерировать набор инструкция тела функции
-        func.body.msil_gen(self)
+        self.msil_gen(func.body)
 
         # при необходимости добавим ret
         if not (isinstance(func.body, ReturnOpNode) or
@@ -384,7 +384,7 @@ class CodeGenerator:
     def msil_gen(self, node: StatementListNode) -> None:
         # ну здесь тупо проходимся по всему списку и делаем с каждым выражением грязь
         for stmt in node.exprs:
-            stmt.msil_gen(self)
+            self.msil_gen(stmt)
 
     # Самая вишенка: генерация всей программы
     def msil_gen_program(self, prog: StatementListNode):
@@ -393,8 +393,8 @@ class CodeGenerator:
         # находим все глобальные переменные и делаем их статическими полями базового класса Program
         global_vars_decls = find_vars_decls(prog)
         for var in global_vars_decls:
-            if var.node_ident.scope == ScopeType.GLOBAL:
-                self.add(f'.field public static {MSIL_TYPE_NAMES[var.node_type.base_type]} _gv{var.node_ident.index}')
+            if var.ident.node_ident.scope == ScopeType.GLOBAL:
+                self.add(f'.field public static {MSIL_TYPE_NAMES[var.node_type.base_type]} _gv{var.ident.node_ident.index}')
         # Тут генерируем все описания функций
         for stmt in prog.exprs:
             if isinstance(stmt, FuncDeclNode):

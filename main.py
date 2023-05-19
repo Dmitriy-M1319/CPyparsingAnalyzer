@@ -14,7 +14,7 @@ def main():
             }
         }
 
-        foo(5);
+        // foo(5);
         string str = "Hello";
         char c = 'a';
         int a = 1;

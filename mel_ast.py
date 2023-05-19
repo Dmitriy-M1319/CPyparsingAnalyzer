@@ -3,7 +3,7 @@ from typing import Optional, Union, Tuple, Callable, List
 from contextlib import suppress
 
 from my_semantic_baza import TYPE_CONVERTIBILITY, \
-    TypeDesc, IdentDesc, IdentScope, SemanticException, BIN_OP_TYPE_COMPATIBILITY
+    TypeDesc, IdentDesc, IdentScope, SemanticException, BIN_OP_TYPE_COMPATIBILITY, ScopeType
 from binop import BinOp
 
 
@@ -79,7 +79,7 @@ class LiteralNode(ValueNode):
         elif isinstance(self.value, float):
             self.node_type = TypeDesc.FLOAT
         elif isinstance(self.value, str):
-            if self.value[0] == '"':
+            if self.literal[0] == '"':
                 self.node_type = TypeDesc.STR
             else:
                 self.node_type = TypeDesc.CHAR
@@ -145,7 +145,7 @@ class BinOpNode(ValueNode):
         self.arg1.semantic_check(scope)
         self.arg2.semantic_check(scope)
 
-        if self.arg1.node_type.is_simple or self.arg2.self_type.is_simple: # если один из аргументов представляет собой простой тип
+        if self.arg1.node_type.is_simple or self.arg2.node_type.is_simple: # если один из аргументов представляет собой простой тип
             compatibility = BIN_OP_TYPE_COMPATIBILITY[self.op] # находим типы, которые между собой могут взаимодействовать
             args_types = (self.arg1.node_type.base_type, self.arg2.node_type.base_type)
             if args_types in compatibility:
@@ -168,7 +168,7 @@ class BinOpNode(ValueNode):
                         return
 
         self.semantic_error("Оператор {} не применим к типам ({}, {})".format(
-            self.op, self.arg1.node_type, self.arg2.self_type
+            self.op, self.arg1.node_type, self.arg2.node_type
         ))
 
 
@@ -213,6 +213,7 @@ class DeclTypeNode(IdentNode):
     def semantic_check(self, scope: IdentScope):
         if self.type is None:
             self.semantic_error('Неизвестный ' + str(self.name) + ' тип')
+        self.node_type = self.type
 
     def to_str_full(self):
         return self.to_str()
@@ -356,7 +357,7 @@ class ForOpNode(StatementNode):
 
 
 class DeclNode(StatementNode):
-    def __init__(self, decl_type: DeclTypeNode, ident: IdentNode, init_value=None, 
+    def __init__(self, decl_type: DeclTypeNode, ident: IdentNode, init_value=None,
                  row: Optional[int] = None, **props) -> None:
         super().__init__(row=row, **props)
         self.decl_type = decl_type
@@ -375,7 +376,10 @@ class DeclNode(StatementNode):
         try:
             scope.add_ident(IdentDesc(self.ident.name, self.decl_type.type))
         except SemanticException as e:
-            self.semantic_error(e.message) 
+            self.semantic_error(e.message)
+        self.ident.semantic_check(scope)
+        if self.init_value != None:
+            self.init_value.semantic_check(scope)
         self.node_type = TypeDesc.VOID
 
     def __str__(self) -> str:
@@ -386,14 +390,16 @@ class DeclListNode(AstNode):
     def __init__(self, *params: DeclNode, row: Optional[int] = None, **props):
         super().__init__(row=row, **props)
         self.params = params
+        print('Hello')
 
     @property
-    def childs(self) -> Tuple[DeclNode]:
+    def childs(self) -> Tuple[AstNode, ...]:
         return self.params
 
     def semantic_check(self, scope: IdentScope):
         for param in self.params:
             param.semantic_check(scope)
+            param.ident.node_ident = scope.add_ident(IdentDesc(param.ident.name, param.decl_type.type, ScopeType.PARAM))
         self.node_type = TypeDesc.VOID
 
     def __str__(self)->str:
@@ -421,11 +427,12 @@ class FuncDeclNode(StatementNode):
         parent_scope = scope
         self.func_type.semantic_check(scope) # проверяем возвращаемый тип
         scope = IdentScope(scope)
+        scope.func = EMPTY_IDENT  # делаем так, что текущая функция не входит в другую функцию
+        self.params.semantic_check(scope)
 
-        scope.func = EMPTY_IDENT # делаем так, что текущая функция не входит в другую функцию
+
         params: List[TypeDesc] = [] # начинаем перебирать параметры
         for param in self.params.params:
-            param.semantic_check(scope)
             params.append(param.decl_type.type)
             # scope.add_ident(IdentDesc(param.ident.name, param.decl_type.type))
 
