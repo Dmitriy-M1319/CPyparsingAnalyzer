@@ -1,6 +1,7 @@
 import os
 import sys
 import my_parser
+import code_gen
 
 import my_semantic_baza
 
@@ -42,10 +43,13 @@ def main():
     scope = my_semantic_baza.prepare_global_scope()
     prog1.semantic_check(scope)
     print(*prog1.tree, sep=os.linesep)
-    print()
     #except my_semantic_baza.SemanticException as e:
      #    print('Ошибка: {}'.format(e.message), file=sys.stderr)
       #   exit(2)
+
+    gen = code_gen.CodeGenerator()
+    gen.msil_gen_program(prog1)
+    print(*gen.code, sep=os.linesep)
 
 
 

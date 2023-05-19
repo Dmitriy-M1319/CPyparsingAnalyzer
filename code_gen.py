@@ -1,8 +1,8 @@
 from typing import List, Union, Any
 
-from . import visitor
-from .my_semantic_baza import CHAR, BaseType, TypeDesc, ScopeType, BinOp
-from .mel_ast import AstNode, DeclListNode, DeclNode, DeclTypeNode, LiteralNode, IdentNode, BinOpNode, TypeConvertNode, FuncCallNode, \
+import visitor
+from my_semantic_baza import CHAR, BaseType, TypeDesc, ScopeType, BinOp
+from mel_ast import AstNode, DeclListNode, DeclNode, DeclTypeNode, LiteralNode, IdentNode, BinOpNode, TypeConvertNode, FuncCallNode, \
     ValueNode, FuncDeclNode, AssignNode, ReturnOpNode, IfOpNode, ForOpNode, StatementListNode, WhileOpNode
 
 RUNTIME_CLASS_NAME = 'CompilerDemo.Runtime'
@@ -153,10 +153,17 @@ class CodeGenerator:
     # Генерация кода для переменной
     # Тут тупо если для переменной заготовлено значение, то генерируем инструкции присваивания
     @visitor.when(DeclNode)
-    def msil_gen(self, node: DeclListNode) -> None:
-        for var in node.params:
-            if isinstance(var, DeclNode):
-                var.msil_gen(self)
+    def msil_gen(self, node: DeclNode) -> None:
+        if node.init_value != None:
+            node.init_value.msil_gen(self)
+            var = node.ident
+            # А теперь то значение, которое мы пихнули в стек, выпихиваем оттуда и сохраняем в память согласно области видимости
+            if var.node_ident.scope == ScopeType.LOCAL:
+                self.add('stloc', var.node_ident.index)
+            elif var.node_ident.scope == ScopeType.PARAM:
+                self.add('starg', var.node_ident.index)
+            elif var.node_ident.scope == ScopeType.GLOBAL:
+                self.add(f'stsfld {MSIL_TYPE_NAMES[var.node_ident.type.base_type]} Program::_gv{var.node_ident.index}')
 
     # Оп, генерация кода для бинарной операции
     @visitor.when(BinOpNode)
@@ -242,6 +249,8 @@ class CodeGenerator:
         # определяем конвертирование целочисленного типа в плавующую точку
         if node.node_type.base_type == BaseType.FLOAT and node.expr.node_type.base_type == BaseType.INT:
             self.add('conv.r8')
+        elif node.node_type.base_type == BaseType.CHAR and node.expr.node_type.base_type == BaseType.INT:
+            self.add('conv.i2')
         # тут тупо приводим число в булевскому типу, как в Си (если не 0, то тру, иначе не тру)
         elif node.expr.node_type.base_type == BaseType.INT:
             self.add('ldc.i4.0')
@@ -352,9 +361,7 @@ class CodeGenerator:
         decl = '.locals init ('
         count = 0
         for var in local_vars_decls:
-            if isinstance(var, AssignNode):
-                var = var.var
-            if var.node_ident.scope in (ScopeType.LOCAL, ):
+            if var.node_ident.scope == ScopeType.LOCAL:
                     if count > 0:
                         decl += ', '
                     decl += f'{MSIL_TYPE_NAMES[var.node_type.base_type]} _v{var.node_ident.index}'
@@ -370,7 +377,6 @@ class CodeGenerator:
         if not (isinstance(func.body, ReturnOpNode) or
                 len(func.body.childs) > 0 and isinstance(func.body.childs[-1], ReturnOpNode)):
             self.add('ret')
-
         self.add('}')
 
     # Генерация списка выражений
@@ -387,8 +393,6 @@ class CodeGenerator:
         # находим все глобальные переменные и делаем их статическими полями базового класса Program
         global_vars_decls = find_vars_decls(prog)
         for var in global_vars_decls:
-            if isinstance(var, AssignNode):
-                var = var.var
             if var.node_ident.scope == ScopeType.GLOBAL:
                 self.add(f'.field public static {MSIL_TYPE_NAMES[var.node_type.base_type]} _gv{var.node_ident.index}')
         # Тут генерируем все описания функций
