@@ -104,7 +104,7 @@ def type_convert(expr: ValueNode, type_: TypeDesc, except_self: Optional[AstNode
         return expr
     # если типы простые и все четко конвертируется
     if expr.node_type.is_simple and type_.is_simple and \
-            expr.node_type.base_type in TYPE_CONVERTIBILITY and type_.base_type in TYPE_CONVERTIBILITY[expr.self_type.base_type]:
+            expr.node_type.base_type in TYPE_CONVERTIBILITY and type_.base_type in TYPE_CONVERTIBILITY[expr.node_type.base_type]:
         return TypeConvertNode(expr, type_)
     else:
         (except_self if except_self else expr).semantic_error('Тип {0}{2} не конвертируется в {1}'.format(
@@ -390,7 +390,6 @@ class DeclListNode(AstNode):
     def __init__(self, *params: DeclNode, row: Optional[int] = None, **props):
         super().__init__(row=row, **props)
         self.params = params
-        print('Hello')
 
     @property
     def childs(self) -> Tuple[AstNode, ...]:

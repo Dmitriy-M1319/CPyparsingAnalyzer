@@ -1,0 +1,31 @@
+void foo(int a) {
+    if (a != 2) {
+        a = a + 1;
+        writeline("a = " + a);
+    }
+}
+
+foo(5);
+string str = "Hello";
+writeline(str);
+char c = 'a';
+int a = 1;
+int s;
+writeline(a);
+for(int i = 1; i < 7; i = i + 1) {
+    s = 7;
+    string p = "a";
+    writeline(p + i);
+}
+writeline("while loop:");
+while (a != 7) {
+    int b;
+    b = a;
+    write(b);
+    write(" ");
+    a = a + 1
+}
+
+if (a > 5) {
+    a = 5;
+}

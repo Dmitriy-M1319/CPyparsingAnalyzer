@@ -1,0 +1,107 @@
+.assembly program
+{
+}
+.class public Program
+{
+  .field public static string _gv0
+  .field public static uint16 _gv1
+  .field public static int32 _gv2
+  .field public static int32 _gv3
+  .field public static int32 _gv4
+  .field public static string _gv5
+  .field public static int32 _gv6
+  .method public static void foo(int32 a) cil managed
+  {
+    ldarg 0
+    ldc.i4 2
+    ceq
+    ldc.i4.0
+    ceq
+    brfalse IL_0
+    ldarg 0
+    ldc.i4 1
+    add
+    starg 0
+    ldstr "a = "
+    ldarg 0
+    call string class CompilerDemo.Runtime::convert(int32)
+    call string class CompilerDemo.Runtime::concat(string, string)
+    call void class CompilerDemo.Runtime::writeline(string)
+    br IL_1
+IL_0:     
+IL_1:     
+    ret
+  }
+  
+  .method public static void Main()
+  {
+    .entrypoint
+    ldc.i4 5
+    call void class Program::foo(int32)
+    ldstr "Hello"
+    stsfld string Program::_gv0
+    ldsfld string Program::_gv0
+    call void class CompilerDemo.Runtime::writeline(string)
+    ldc.i4 97
+    stsfld uint16 Program::_gv1
+    ldc.i4 1
+    stsfld int32 Program::_gv2
+    ldsfld int32 Program::_gv2
+    call string class CompilerDemo.Runtime::convert(int32)
+    call void class CompilerDemo.Runtime::writeline(string)
+    ldc.i4 1
+    stsfld int32 Program::_gv4
+IL_2:     
+    ldsfld int32 Program::_gv4
+    ldc.i4 7
+    clt
+    brfalse IL_3
+    ldc.i4 7
+    stsfld int32 Program::_gv3
+    ldstr "a"
+    stsfld string Program::_gv5
+    ldsfld string Program::_gv5
+    ldsfld int32 Program::_gv4
+    call string class CompilerDemo.Runtime::convert(int32)
+    call string class CompilerDemo.Runtime::concat(string, string)
+    call void class CompilerDemo.Runtime::writeline(string)
+    ldsfld int32 Program::_gv4
+    ldc.i4 1
+    add
+    stsfld int32 Program::_gv4
+    br IL_2
+IL_3:     
+    ldstr "while loop:"
+    call void class CompilerDemo.Runtime::writeline(string)
+IL_4:     
+    ldsfld int32 Program::_gv2
+    ldc.i4 7
+    ceq
+    ldc.i4.0
+    ceq
+    brfalse IL_5
+    ldsfld int32 Program::_gv2
+    stsfld int32 Program::_gv6
+    ldsfld int32 Program::_gv6
+    call string class CompilerDemo.Runtime::convert(int32)
+    call void class CompilerDemo.Runtime::write(string)
+    ldstr " "
+    call void class CompilerDemo.Runtime::write(string)
+    ldsfld int32 Program::_gv2
+    ldc.i4 1
+    add
+    stsfld int32 Program::_gv2
+    br IL_4
+IL_5:     
+    ldsfld int32 Program::_gv2
+    ldc.i4 5
+    cgt
+    brfalse IL_6
+    ldc.i4 5
+    stsfld int32 Program::_gv2
+    br IL_7
+IL_6:     
+IL_7:     
+    ret
+  }
+}

@@ -1,9 +1,9 @@
 from typing import List, Union, Any
 
 import visitor
-from my_semantic_baza import CHAR, BaseType, TypeDesc, ScopeType, BinOp
-from mel_ast import AstNode, DeclListNode, DeclNode, DeclTypeNode, LiteralNode, IdentNode, BinOpNode, TypeConvertNode, FuncCallNode, \
-    ValueNode, FuncDeclNode, AssignNode, ReturnOpNode, IfOpNode, ForOpNode, StatementListNode, WhileOpNode
+from my_semantic_baza import BaseType, TypeDesc, ScopeType, BinOp
+from mel_ast import AstNode, DeclNode, LiteralNode, IdentNode, BinOpNode, TypeConvertNode, FuncCallNode, \
+    FuncDeclNode, AssignNode, ReturnOpNode, IfOpNode, ForOpNode, StatementListNode, WhileOpNode
 
 RUNTIME_CLASS_NAME = 'CompilerDemo.Runtime'
 PROGRAM_CLASS_NAME = 'Program'
@@ -115,7 +115,7 @@ class CodeGenerator:
         if node.node_type.base_type == BaseType.INT:
             self.add('ldc.i4', node.value)
         elif node.node_type.base_type == BaseType.CHAR:
-            self.add('ldc.i2', ord(node.value))
+            self.add('ldc.i4', ord(node.value))
         elif node.node_type.base_type == BaseType.FLOAT:
             self.add('ldc.r8', str(node.value))
         elif node.node_type.base_type == BaseType.STR:
@@ -142,7 +142,6 @@ class CodeGenerator:
         # Добавляем инструкцию для аргумента присваивания
         self.msil_gen(node.val)
         var = node.var
-        # А теперь то значение, которое мы пихнули в стек, выпихиваем оттуда и сохраняем в память согласно области видимости
         if var.node_ident.scope == ScopeType.LOCAL:
             self.add('stloc', var.node_ident.index)
         elif var.node_ident.scope == ScopeType.PARAM:
@@ -170,7 +169,7 @@ class CodeGenerator:
     def msil_gen(self, node: BinOpNode) -> None:
         # Генерируем инструкции для аргументов нашего действия (укладываем в стек)
         self.msil_gen(node.arg1)
-        self.msil_gen(node.arg1)
+        self.msil_gen(node.arg2)
         # Итак, если операция - это неравенство
         if node.op == BinOp.NE:
             if node.arg1.node_type == TypeDesc.STR:
@@ -241,22 +240,19 @@ class CodeGenerator:
     # Генерация кода для преобразования типов
     @visitor.when(TypeConvertNode)
     def msil_gen(self, node: TypeConvertNode) -> None:
-        # Сначала в стек надо пихнуть надо выражение, которое будет преобразовано
-        node.expr.msil_gen(self)
-        # Кто то забыл слово надо :)
-        # часто встречаемые варианты будет реализовывать в коде, а не через класс Runtime
-        
+        self.msil_gen(node.expr)
+
         # определяем конвертирование целочисленного типа в плавующую точку
         if node.node_type.base_type == BaseType.FLOAT and node.expr.node_type.base_type == BaseType.INT:
             self.add('conv.r8')
         elif node.node_type.base_type == BaseType.CHAR and node.expr.node_type.base_type == BaseType.INT:
-            self.add('conv.i2')
-        # тут тупо приводим число в булевскому типу, как в Си (если не 0, то тру, иначе не тру)
-        elif node.expr.node_type.base_type == BaseType.INT:
-            self.add('ldc.i4.0')
-            self.add('ceq')
-            self.add('ldc.i4.0')
-            self.add('ceq')
+            self.add('conv.i4')
+        # # тут тупо приводим число в булевскому типу, как в Си (если не 0, то тру, иначе не тру)
+        # elif node.expr.node_type.base_type == BaseType.INT:
+        #     self.add('ldc.i4.0')
+        #     self.add('ceq')
+        #     self.add('ldc.i4.0')
+        #     self.add('ceq')
         else:
             # используется фича преобразования из стандартной либы
             cmd = f'call {MSIL_TYPE_NAMES[node.node_type.base_type]} class {RUNTIME_CLASS_NAME}::convert({MSIL_TYPE_NAMES[node.expr.node_type.base_type]})'
@@ -266,12 +262,12 @@ class CodeGenerator:
     @visitor.when(FuncCallNode)
     def msil_gen(self, node: FuncCallNode) -> None:
         # Сначала надо сгенерить код и поместить все параметры в стек
-        for param in node.params:
-            param.msil_gen(self)
+        for param in node.params.params:
+            self.msil_gen(param)
 
         # Потом надо определиться с названием вызова функции и расставления параметров
         class_name = RUNTIME_CLASS_NAME if node.name.node_ident.built_in else PROGRAM_CLASS_NAME
-        param_types = ', '.join(MSIL_TYPE_NAMES[param.node_type.base_type] for param in node.params)
+        param_types = ', '.join(MSIL_TYPE_NAMES[param.node_type.base_type] for param in node.params.params)
         # Просто инструкция вызова функции
         cmd = f'call {MSIL_TYPE_NAMES[node.node_type.base_type]} class {class_name}::{node.name.name}({param_types})'
         self.add(cmd)
@@ -394,7 +390,7 @@ class CodeGenerator:
         global_vars_decls = find_vars_decls(prog)
         for var in global_vars_decls:
             if var.ident.node_ident.scope == ScopeType.GLOBAL:
-                self.add(f'.field public static {MSIL_TYPE_NAMES[var.node_type.base_type]} _gv{var.ident.node_ident.index}')
+                self.add(f'.field public static {MSIL_TYPE_NAMES[var.decl_type.node_type.base_type]} _gv{var.ident.node_ident.index}')
         # Тут генерируем все описания функций
         for stmt in prog.exprs:
             if isinstance(stmt, FuncDeclNode):
