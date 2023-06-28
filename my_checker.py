@@ -144,8 +144,8 @@ class SemanticChecker:
 
     @visitor.when(AssignNode) # посещаем присваивание
     def semantic_check(self, node: AssignNode, scope: IdentScope):
-        node.var.semantic_check(self, scope)
-        node.val.semantic_check(self, scope)
+        node.var.semantic_check(scope)
+        node.val.semantic_check(scope)
         node.val = type_convert(node.val, node.var.node_type, node, 'присваиваемое значение')
         node.node_type = node.var.node_type
 
@@ -195,6 +195,27 @@ class SemanticChecker:
         node.stmt.semantic_check(self, scope) # проверяем выражения в заголовке цикла
         node.body.semantic_check(self, IdentScope(scope))
         node.node_type = TypeDesc.VOID
+
+    @visitor.when(ArrNode)
+    def semantic_check(self, node: ArrNode, scope: IdentScope):
+        scope = IdentScope(scope)
+        if node.length <= 0:
+            node.semantic_error('Длина массива {} не может быть отрицательным или нулевым значением'.format(node.ident.name))
+        for element in node.elements:
+            element.semantic_check(scope)
+        try:
+            scope.add_ident(IdentDesc(node.ident, node.node_type.type))
+        except SemanticException as e:
+            node.semantic_error(e.message) 
+
+    @visitor.when(ArrItemNode)
+    def semantic_check(self, node: ArrItemNode, scope: IdentScope):
+        scope = IdentScope(scope)
+        arr = scope.get_ident(node.ident.name)
+        if arr is None:
+            node.semantic_error('Массив {} не найден'.format(node.ident.name))
+        if node.index < 0:
+            node.semantic_error('Индекс для массива {} не может быть отрицательным значением'.format(node.ident.name))
 
     @visitor.when(DeclListNode)
     def semantic_check(self, node: DeclListNode, scope: IdentScope):

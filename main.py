@@ -39,17 +39,27 @@ def main1():
 
 def main():
     prog = '''
-        void main(int argc) {
+        int main(int argc) {
             int a[3] = {1, 2, 3};
             int k = a[2];
             a[3] = 0;
-            func(k, arr[1]);
+            return 0;
         }
     '''
     
     prog1 = my_parser.parse(prog)
     print(prog1)
     print(*prog1.tree, sep=os.linesep)
+    # scope = my_semantic_baza.prepare_global_scope()
+    print()
+    print('Семантический анализ:')
+    try:
+        scope = my_semantic_baza.prepare_global_scope()
+        prog1.semantic_check(scope)
+        print(*prog1.tree, sep=os.linesep)
+    except my_semantic_baza.SemanticException as e:
+        print('Ошибка: {}'.format(e.message), file=sys.stderr)
+        exit(2)
 
 
 if __name__ == "__main__":

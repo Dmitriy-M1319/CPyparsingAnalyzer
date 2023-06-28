@@ -391,11 +391,11 @@ class ArrNode(StatementNode):
     """
     Узел объявления самого массива в программе
     """
-    def __init__(self, arr_type: DeclTypeNode, ident: IdentNode, length: int, *elements: ValueNode,
+    def __init__(self, arr_type: DeclTypeNode, name: IdentNode, length: ValueNode, *elements: ValueNode,
                  row: Optional[int] = None, **props) -> None:
         super().__init__(row, **props)
         self.arr_type = arr_type
-        self.ident = ident
+        self.name = name
         self.length = length
         self.elements = elements
 
@@ -404,24 +404,40 @@ class ArrNode(StatementNode):
         return self.elements
 
     def __str__(self) -> str:
-        return "array: {}".format(self.ident)
+        return "array: {}".format(self.name)
+
+    def semantic_check(self, scope: IdentScope):
+        self.arr_type.semantic_check(scope)
+        for element in self.elements:
+            element.semantic_check(scope)
+        try:
+            scope.add_ident(IdentDesc(self.name.name, self.arr_type.type))
+        except SemanticException as e:
+            self.semantic_error(e.message)
 
 
 class ArrItemNode(ValueNode):
     """
     Обращение к элементу массива по индексу
     """
-    def __init__(self, ident: IdentNode, index: int, row: Optional[int] = None, **props) -> None:
+    def __init__(self, ident: IdentNode, index: ValueNode, row: Optional[int] = None, **props) -> None:
         super().__init__(row, **props)
         self.ident = ident
         self.index = index
+        self.type = None
 
     @property
-    def childs(self) -> Tuple[int, ...]:
+    def childs(self) -> Tuple['AstNode', ...]:
         return self.index,
 
     def __str__(self) -> str:
         return "arr \"{}\" item".format(self.ident)
+
+    def semantic_check(self, scope: IdentScope):
+        arr = scope.get_ident(self.ident.name)
+        if arr is None:
+            self.semantic_error('Массив {} не найден'.format(self.ident.name))
+        self.node_type = arr.type
 
 
 class DeclListNode(AstNode):
@@ -576,7 +592,7 @@ class ReturnOpNode(StatementNode):
         if func_scope is None:
             self.semantic_error('Оператор return применим только к функции')
         # пытаемся понять, подходит ли возврат к возвращаемому значению функции
-        self.value = type_convert(self.value, func_scope.func.func_type.return_type, self, 'возвращаемое значение')
+        self.value = type_convert(self.value, func_scope.func.type.return_type, self, 'возвращаемое значение')
         self.node_type = TypeDesc.VOID
 
     def __str__(self) -> str:
