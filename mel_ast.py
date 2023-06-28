@@ -391,7 +391,7 @@ class ArrNode(StatementNode):
     """
     Узел объявления самого массива в программе
     """
-    def __init__(self, arr_type: DeclTypeNode, name: IdentNode, length: ValueNode, *elements: ValueNode,
+    def __init__(self, arr_type: DeclTypeNode, name: IdentNode, length: LiteralNode, *elements: LiteralNode,
                  row: Optional[int] = None, **props) -> None:
         super().__init__(row, **props)
         self.arr_type = arr_type
@@ -408,8 +408,13 @@ class ArrNode(StatementNode):
 
     def semantic_check(self, scope: IdentScope):
         self.arr_type.semantic_check(scope)
+        if not type(self.length.value) is int:
+            self.semantic_error("Длина массива {} имеет некорректный тип".format(self.name.name))
+        if self.length.value <= 0:
+            self.semantic_error("Длина массива {} не может быть отрицательным или нулевым значением".format(self.name.name))
         for element in self.elements:
             element.semantic_check(scope)
+            # придумать проверку на типизацию
         try:
             scope.add_ident(IdentDesc(self.name.name, self.arr_type.type))
         except SemanticException as e:
@@ -420,7 +425,7 @@ class ArrItemNode(ValueNode):
     """
     Обращение к элементу массива по индексу
     """
-    def __init__(self, ident: IdentNode, index: ValueNode, row: Optional[int] = None, **props) -> None:
+    def __init__(self, ident: IdentNode, index: LiteralNode, row: Optional[int] = None, **props) -> None:
         super().__init__(row, **props)
         self.ident = ident
         self.index = index
@@ -437,6 +442,10 @@ class ArrItemNode(ValueNode):
         arr = scope.get_ident(self.ident.name)
         if arr is None:
             self.semantic_error('Массив {} не найден'.format(self.ident.name))
+        if not type(self.index.value) is int:
+            self.semantic_error("Индекс массива {} имеет некорректный тип".format(self.ident.name))
+        if self.index.value < 0:
+            self.semantic_error("Индекс массива {} не может быть отрицательным значением".format(self.ident.name))
         self.node_type = arr.type
 
 

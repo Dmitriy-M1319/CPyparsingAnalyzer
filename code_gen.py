@@ -3,7 +3,7 @@ from typing import List, Union, Any
 import visitor
 from my_semantic_baza import BaseType, TypeDesc, ScopeType, BinOp
 from mel_ast import AstNode, DeclNode, LiteralNode, IdentNode, BinOpNode, TypeConvertNode, FuncCallNode, \
-    FuncDeclNode, AssignNode, ReturnOpNode, IfOpNode, ForOpNode, StatementListNode, WhileOpNode
+    FuncDeclNode, AssignNode, ReturnOpNode, IfOpNode, ForOpNode, StatementListNode, WhileOpNode, ArrNode
 
 RUNTIME_CLASS_NAME = 'CompilerDemo.Runtime'
 PROGRAM_CLASS_NAME = 'Program'
@@ -334,6 +334,14 @@ class CodeGenerator:
         self.msil_gen(node.stmt)
         self.add('br', start_label)
         self.add('', label=end_label)
+
+    # Возможная генерация кода для массива
+    @visitor.when(ArrNode)
+    def msil_gen(self, arr: ArrNode) -> None:
+        # обычный вариант создания массива
+        self.add('ldc.i4.{}'.format(LiteralNode(arr.length).value))
+        self.add(f'newarr {MSIL_TYPE_NAMES[arr.node_type.base_type]}')
+        self.add(f'stsfld {MSIL_TYPE_NAMES[arr.node_type.base_type]}[] {arr.name.name}')
 
     # Генерация кода описания функции
     @visitor.when(FuncDeclNode)
