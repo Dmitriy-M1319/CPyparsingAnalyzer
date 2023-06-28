@@ -6,11 +6,12 @@ import inspect
 """Грамматика:
         num   -> <число>
         ident -> <идентификатор>
-        group -> num | ident | '(' add ')'
+        group -> num | ident | array | '(' add ')'
         mult  -> group (('*' | '/') group)*
         add   -> mult (('+' | '-') mult)*
         bool  -> add (('==' | '!=' | '>=' | '<=' | '>' | '<') add)*
         comp -> bool (('&&' | '||' ) bool)*
+        array
         expr  -> comp
         decl  -> 'type' ident ( = expr )?
         params -> decl (, decl)*
@@ -27,7 +28,6 @@ import inspect
 def _parser():
 
     # Токены
-    DOT = plt.Literal('.').suppress()
     LPAREN = plt.Literal('(').suppress()
     RPAREN = plt.Literal(')').suppress()
     LBRACKET = plt.Literal('[').suppress()
@@ -76,12 +76,14 @@ def _parser():
     ident = plt.pyparsing_common.identifier.copy().setName('ident')
     decl_type = ident.copy().setName('decl_type')
 
+
     # Группа
     add = plt.Forward()
     mult = plt.Forward()
     expression = plt.Forward()
     func_call = plt.Forward()
-    group = literal | func_call | ident | LPAREN + expression + RPAREN
+    arr_item = plt.Forward()
+    group = literal | arr_item | func_call | ident | LPAREN + expression + RPAREN
 
     # Умножение
     mult = plt.Group(group + plt.ZeroOrMore((MUL | DIV) + group)).setName('bin_op')
@@ -105,9 +107,14 @@ def _parser():
     statement_list = plt.Forward()
 
     # Присваивание переменной
-    assign = ident + ASSIGN + expression
+    assign = (arr_item | ident) + ASSIGN + expression
     # Объявление переменной
     decl = decl_type + ident + plt.Optional(ASSIGN + expression)
+
+    # Объявление массива
+    arr = decl_type + ident + LBRACKET + expression + RBRACKET + plt.Optional(ASSIGN + LBRACE + plt.ZeroOrMore(expression + plt.Optional(COMMA)) + RBRACE)
+    # Обращение к элементу массива по определенному индексу
+    arr_item << ident + LBRACKET + expression + RBRACKET
 
     # Объявление параметров функции
     decl_list = plt.ZeroOrMore(decl + plt.Optional(COMMA))
@@ -118,7 +125,7 @@ def _parser():
 
     # Объявление функции
     func_decl = decl_type + ident + LPAREN + decl_list + RPAREN + op_body
-    func_call = ident + LPAREN + value_list + RPAREN
+    func_call << ident + LPAREN + value_list + RPAREN
 
     # Оператор возврата значения
     return_op = plt.Keyword('return').suppress() + plt.Optional(expression)
@@ -137,6 +144,7 @@ def _parser():
     # Выражение
     statement << (
             func_decl |
+            arr | 
             decl |
             if_op |
             for_op |

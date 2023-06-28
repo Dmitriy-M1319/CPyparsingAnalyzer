@@ -7,7 +7,7 @@ import argparse
 import my_semantic_baza
 
 
-def main():
+def main1():
     parser = argparse.ArgumentParser(description='Compiler demo program (msil)')
     parser.add_argument('src', type=str, help='source code file')
     parser.add_argument('--msil-only', default=False, action='store_true', help='print only msil code (no ast)')
@@ -36,6 +36,20 @@ def main():
     gen.msil_gen_program(prog1)
     print(*gen.code, sep=os.linesep)
 
+
+def main():
+    prog = '''
+        void main(int argc) {
+            int a[3] = {1, 2, 3};
+            int k = a[2];
+            a[3] = 0;
+            func(k, arr[1]);
+        }
+    '''
+    
+    prog1 = my_parser.parse(prog)
+    print(prog1)
+    print(*prog1.tree, sep=os.linesep)
 
 
 if __name__ == "__main__":

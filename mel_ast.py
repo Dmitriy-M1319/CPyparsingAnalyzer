@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Union, Tuple, Callable, List
+from typing import Any, Optional, Union, Tuple, Callable, List
 from contextlib import suppress
 
 from my_semantic_baza import TYPE_CONVERTIBILITY, \
@@ -128,6 +128,7 @@ class IdentNode(ValueNode):
         return str(self.name)
 
 
+
 class BinOpNode(ValueNode):
     def __init__(self, op: BinOp, arg1: ValueNode, arg2: ValueNode, 
                  row: Optional[int] = None, **props):
@@ -239,14 +240,14 @@ class TypeConvertNode(ValueNode):
 
 
 class AssignNode(StatementNode):
-    def __init__(self, var: IdentNode, val: ValueNode, 
+    def __init__(self, var: StatementNode, val: ValueNode, 
                  row: Optional[int] = None, **props):
         super().__init__(row=row, **props)
         self.var = var
         self.val = val
 
     @property
-    def childs(self) -> Tuple[IdentNode, ValueNode]:
+    def childs(self) -> Tuple[StatementNode, ValueNode]:
         return (self.var, self.val)
 
     def semantic_check(self, scope: IdentScope):
@@ -384,6 +385,43 @@ class DeclNode(StatementNode):
 
     def __str__(self) -> str:
         return f'variable: {self.decl_type}'
+
+
+class ArrNode(StatementNode):
+    """
+    Узел объявления самого массива в программе
+    """
+    def __init__(self, arr_type: DeclTypeNode, ident: IdentNode, length: int, *elements: ValueNode,
+                 row: Optional[int] = None, **props) -> None:
+        super().__init__(row, **props)
+        self.arr_type = arr_type
+        self.ident = ident
+        self.length = length
+        self.elements = elements
+
+    @property
+    def childs(self) -> Tuple[ValueNode]:
+        return self.elements
+
+    def __str__(self) -> str:
+        return "array: {}".format(self.ident)
+
+
+class ArrItemNode(ValueNode):
+    """
+    Обращение к элементу массива по индексу
+    """
+    def __init__(self, ident: IdentNode, index: int, row: Optional[int] = None, **props) -> None:
+        super().__init__(row, **props)
+        self.ident = ident
+        self.index = index
+
+    @property
+    def childs(self) -> Tuple[int, ...]:
+        return self.index,
+
+    def __str__(self) -> str:
+        return "arr \"{}\" item".format(self.ident)
 
 
 class DeclListNode(AstNode):
