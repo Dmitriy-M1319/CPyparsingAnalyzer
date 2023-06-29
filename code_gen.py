@@ -339,9 +339,28 @@ class CodeGenerator:
     @visitor.when(ArrNode)
     def msil_gen(self, arr: ArrNode) -> None:
         # обычный вариант создания массива
-        self.add('ldc.i4.{}'.format(LiteralNode(arr.length).value))
+        self.add(f'.field public static {MSIL_TYPE_NAMES[arr.node_type.base_type]}[] {arr.name.name}')
+        # Загружаем в стек размер массива
+        self.add('ldc.i4.{}'.format(arr.length.value))
+        # Теперь инициализируем массив в памяти
         self.add(f'newarr {MSIL_TYPE_NAMES[arr.node_type.base_type]}')
-        self.add(f'stsfld {MSIL_TYPE_NAMES[arr.node_type.base_type]}[] {arr.name.name}')
+        self.add(f'stsfld {MSIL_TYPE_NAMES[arr.node_type.base_type]}[] Program::{arr.name.name}')
+
+        # После этого, если есть какие то начальные значения, то заполняем массив ими
+        init_arr_str: str = ''
+        if arr.arr_type.node_type.base_type == BaseType.INT or arr.arr_type.node_type.base_type == BaseType.CHAR:
+            init_arr_str = 'stelem.i4'
+        else:
+            init_arr_str = 'stelem.r8'
+        # Со строками пока не понятно
+
+        for i in range(0, arr.length.value):
+            # Загружаем в стек индекс массива
+            self.add(f'ldc.i4.{i}')
+            # И затем само значение
+            self.msil_gen(arr.elements[i])
+            # После этого инициализируем определенную ячейку памяти массива этим значением
+            self.add(init_arr_str)
 
     # Генерация кода описания функции
     @visitor.when(FuncDeclNode)

@@ -412,6 +412,8 @@ class ArrNode(StatementNode):
             self.semantic_error("Длина массива {} имеет некорректный тип".format(self.name.name))
         if self.length.value <= 0:
             self.semantic_error("Длина массива {} не может быть отрицательным или нулевым значением".format(self.name.name))
+        if self.length.value < len(self.elements):
+            self.semantic_error("Слишком большое количество начальных значений для массива {}".format(self.name.name))
         for element in self.elements:
             element.semantic_check(scope)
             # придумать проверку на типизацию
