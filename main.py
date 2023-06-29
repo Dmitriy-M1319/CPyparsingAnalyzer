@@ -39,14 +39,11 @@ def main1():
 
 def main():
     prog = '''
-        int main(int argc) {
-            int a[3] = {1, 2, 3};
-            int k = a[2];
-            a[3] = 0;
-            return 0;
-        }
+        int a[3] = {1, 2, 3};
+        int k = a[2];
+        a[0] = 4;
     '''
-    
+
     prog1 = my_parser.parse(prog)
     print(prog1)
     print(*prog1.tree, sep=os.linesep)
@@ -60,6 +57,11 @@ def main():
     except my_semantic_baza.SemanticException as e:
         print('Ошибка: {}'.format(e.message), file=sys.stderr)
         exit(2)
+    print(" ")
+    print("msil:")
+    gen = code_gen.CodeGenerator()
+    gen.msil_gen_program(prog1)
+    print(*gen.code, sep=os.linesep)
 
 
 if __name__ == "__main__":

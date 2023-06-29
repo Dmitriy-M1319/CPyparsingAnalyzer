@@ -3,7 +3,7 @@ from typing import List, Union, Any
 import visitor
 from my_semantic_baza import BaseType, TypeDesc, ScopeType, BinOp
 from mel_ast import AstNode, DeclNode, LiteralNode, IdentNode, BinOpNode, TypeConvertNode, FuncCallNode, \
-    FuncDeclNode, AssignNode, ReturnOpNode, IfOpNode, ForOpNode, StatementListNode, WhileOpNode, ArrNode
+    FuncDeclNode, AssignNode, ReturnOpNode, IfOpNode, ForOpNode, StatementListNode, WhileOpNode, ArrNode, ArrItemNode
 
 RUNTIME_CLASS_NAME = 'CompilerDemo.Runtime'
 PROGRAM_CLASS_NAME = 'Program'
@@ -140,7 +140,13 @@ class CodeGenerator:
     @visitor.when(AssignNode)
     def msil_gen(self, node: AssignNode) -> None:
         # Добавляем инструкцию для аргумента присваивания
-        self.msil_gen(node.val)
+        if isinstance(node.var, ArrItemNode):
+            self.arr_item_set_msil_gen(node.var, node.val)
+            return
+        if isinstance(node.val, ArrItemNode):
+            self.arr_item_get_msil_gen(node.val)
+        else:
+            self.msil_gen(node.val)
         var = node.var
         if var.node_ident.scope == ScopeType.LOCAL:
             self.add('stloc', var.node_ident.index)
@@ -154,7 +160,10 @@ class CodeGenerator:
     @visitor.when(DeclNode)
     def msil_gen(self, node: DeclNode) -> None:
         if node.init_value != None:
-            self.msil_gen(node.init_value)
+            if isinstance(node.init_value, ArrItemNode):
+                self.arr_item_get_msil_gen(node.init_value)
+            else:
+                self.msil_gen(node.init_value)
             var = node.ident
             # А теперь то значение, которое мы пихнули в стек, выпихиваем оттуда и сохраняем в память согласно области видимости
             if var.node_ident.scope == ScopeType.LOCAL:
@@ -168,8 +177,14 @@ class CodeGenerator:
     @visitor.when(BinOpNode)
     def msil_gen(self, node: BinOpNode) -> None:
         # Генерируем инструкции для аргументов нашего действия (укладываем в стек)
-        self.msil_gen(node.arg1)
-        self.msil_gen(node.arg2)
+        if isinstance(node.arg1, ArrItemNode):
+            self.arr_item_get_msil_gen(node.arg1)
+        else:
+            self.msil_gen(node.arg1)
+        if isinstance(node.arg2, ArrItemNode):
+            self.arr_item_get_msil_gen(node.arg2)
+        else:
+            self.msil_gen(node.arg2)
         # Итак, если операция - это неравенство
         if node.op == BinOp.NE:
             if node.arg1.node_type == TypeDesc.STR:
@@ -263,7 +278,10 @@ class CodeGenerator:
     def msil_gen(self, node: FuncCallNode) -> None:
         # Сначала надо сгенерить код и поместить все параметры в стек
         for param in node.params.params:
-            self.msil_gen(param)
+            if isinstance(param, ArrItemNode):
+                self.arr_item_get_msil_gen(param)
+            else:
+                self.msil_gen(param)
 
         # Потом надо определиться с названием вызова функции и расставления параметров
         class_name = RUNTIME_CLASS_NAME if node.name.node_ident.built_in else PROGRAM_CLASS_NAME
@@ -277,7 +295,10 @@ class CodeGenerator:
     def msil_gen(self, node: ReturnOpNode) -> None:
         # тут ничего сверхъестественного: сначала помещаем то, что мы возвращаем, в стек, 
         # а потом делаем return через местную инструкцию ret
-        self.msil_gen(node.value)
+        if isinstance(node.value, ArrItemNode):
+            self.arr_item_get_msil_gen(node.value)
+        else:
+            self.msil_gen(node.value)
         self.add('ret')
 
     # Генерация кода для if (вот он, условный переход)
@@ -347,12 +368,12 @@ class CodeGenerator:
         self.add(f'stsfld {MSIL_TYPE_NAMES[arr.node_type.base_type]}[] Program::{arr.name.name}')
 
         # После этого, если есть какие то начальные значения, то заполняем массив ими
-        init_arr_str: str = ''
         if arr.arr_type.node_type.base_type == BaseType.INT or arr.arr_type.node_type.base_type == BaseType.CHAR:
             init_arr_str = 'stelem.i4'
-        else:
+        elif arr.arr_type.node_type.base_type == BaseType.FLOAT:
             init_arr_str = 'stelem.r8'
-        # Со строками пока не понятно
+        else:
+            init_arr_str = 'stelem.ref'  # Для строк
 
         for i in range(0, arr.length.value):
             # Загружаем в стек индекс массива
@@ -361,6 +382,31 @@ class CodeGenerator:
             self.msil_gen(arr.elements[i])
             # После этого инициализируем определенную ячейку памяти массива этим значением
             self.add(init_arr_str)
+
+    # Вариант генерации кода для получения элемента массива по индексу
+    def arr_item_get_msil_gen(self, item: ArrItemNode):
+        # Сначала загружаем индекс в стек
+        self.add(f'ldc.i4.{item.index.value}')
+        if item.node_type.base_type == BaseType.INT or item.node_type.base_type == BaseType.CHAR:
+            get_arr_str = 'ldelem.i4'
+        elif item.node_type.base_type == BaseType.FLOAT:
+            get_arr_str = 'ldelem.r8'
+        else:
+            get_arr_str = 'ldelem.ref'      # Для строк
+        self.add(get_arr_str + f' Program::{item.ident.name}')
+
+    # Вариант генерации кода для установки значения элемента массива по индексу
+    def arr_item_set_msil_gen(self, item: ArrItemNode, value):
+        # Сначала загружаем индекс в стек
+        self.add(f'ldc.i4.{item.index.value}')
+        self.msil_gen(value)
+        if item.node_type.base_type == BaseType.INT or item.node_type.base_type == BaseType.CHAR:
+            set_arr_str = 'stelem.i4'
+        elif item.node_type.base_type == BaseType.FLOAT:
+            set_arr_str = 'stelem.r8'
+        else:
+            set_arr_str = 'stelem.ref'  # Для строк
+        self.add(set_arr_str + f' Program::{item.ident.name}')
 
     # Генерация кода описания функции
     @visitor.when(FuncDeclNode)

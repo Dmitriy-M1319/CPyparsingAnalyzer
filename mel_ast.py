@@ -408,6 +408,7 @@ class ArrNode(StatementNode):
 
     def semantic_check(self, scope: IdentScope):
         self.arr_type.semantic_check(scope)
+        self.node_type = self.arr_type.node_type
         if not type(self.length.value) is int:
             self.semantic_error("Длина массива {} имеет некорректный тип".format(self.name.name))
         if self.length.value <= 0:
@@ -421,6 +422,7 @@ class ArrNode(StatementNode):
             scope.add_ident(IdentDesc(self.name.name, self.arr_type.type))
         except SemanticException as e:
             self.semantic_error(e.message)
+        self.name.semantic_check(scope)
 
 
 class ArrItemNode(ValueNode):
